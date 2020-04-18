@@ -1,0 +1,2 @@
+test_files/*.bash_notebook*md
+test_files/*.bash_notebook*sh

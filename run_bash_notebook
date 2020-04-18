@@ -1,0 +1,62 @@
+#!/usr/bin/env ruby
+Signal.trap("PIPE", "EXIT")
+
+require "logger"
+
+logger = Logger.new STDOUT
+
+infile = ARGV[0]
+
+now = Time.now.strftime "%Y-%m-%d_%H-%M-%S-%L"
+
+notebook_script = infile.sub(/.md$/, "") + ".bash_notebook_#{now}.sh"
+notebook_output = infile.sub(/.md$/, "") + ".bash_notebook_#{now}.md"
+
+check = '
+if [ $? -ne 0 ]; then
+    >&2 echo "JOB FAILURE: code $?"
+    exit 1
+fi
+
+'
+
+logger.info { "Generating your bash notebook script!" }
+
+File.open(notebook_script, "w") do |f|
+  in_bash_block = false
+
+  File.open(infile, "rt").each_line do |line|
+    line.chomp!
+
+    if line.start_with? "```{bash}"
+      in_bash_block = true
+      f.puts "echo '```'"
+    elsif line.start_with?("```") && in_bash_block
+      f.puts "echo '```'"
+      # closing delimiter of a bash block
+      in_bash_block = false
+
+      f.puts check
+    elsif in_bash_block
+      # In addition to escaping ", we also want to escape $ since
+      # it'll be a variable.
+      f.puts %Q{echo "$ #{line.gsub('"', '\"').gsub('$', '\$')}"}
+
+      f.puts line
+    elsif line.start_with? "```"
+      f.puts "echo '```'"
+    else
+      f.puts %Q{echo "#{line.gsub('"', '\"')}"}
+    end
+  end
+end
+
+logger.info { "Your notebook is running!  If it's taking a while, you could monitor the progress using a command like this: tail -f #{notebook_output}" }
+
+`bash #{notebook_script} >#{notebook_output} 2>&1`
+
+if $?.success?
+  logger.info { "Your notebook successfuly ran!  You can now open #{notebook_output} in your favorite Markdown editor!" }
+else
+  logger.error { "There was an error while running your notebook! D: Check #{notebook_output} to see what happened!" }
+end
