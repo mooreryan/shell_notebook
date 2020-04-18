@@ -20,42 +20,13 @@ Try it out!
 
 ```
 ./run_bash_notebook test_files/test.md
-```
+```  
 
-### Notes
-
-#### One "command" per bash block
-
-You should only specify a single command within a single `{bash}` block, unless the commands are joined by a `&&`.  E.g.,
-
-```
-echo 'hi' && echo 'ryan'
-```
-
-would be fine inside a bash block, but 
-
-```
-echo 'hi'
-echo 'ryan'
-```
-
-would not.
-
-Mainly it's because of the exit code checking that happens at the end of each bash block.
-
-Also, `for` loops will work okay too...The following is perfectly fine inside a bash block.
-
-```
-for i in {1..10}; do 
-  echo $i
-done
-```
-
-  
+There are a lot more examples describing some of the cool stuff you can do in the `test_files` directory.
 
 #### Keep the Markdown basic
 
-I've only tested it with some pretty basic Markdown so far (see `test_files/test.md`).  Who knows how well it'll work with super complicated and spiffier Markdown files `¯\_(ツ)_/¯`!
+I've only tested it with some pretty basic Markdown so far (see `test_files/*.md`).  Who knows how well it'll work with super complicated and spiffier Markdown files `¯\_(ツ)_/¯`!
 
 ## Inspiration
 
