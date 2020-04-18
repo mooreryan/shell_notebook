@@ -12,41 +12,75 @@ now = Time.now.strftime "%Y-%m-%d_%H-%M-%S-%L"
 notebook_script = infile.sub(/.md$/, "") + ".bash_notebook_#{now}.sh"
 notebook_output = infile.sub(/.md$/, "") + ".bash_notebook_#{now}.md"
 
-check = '
-if [ $? -ne 0 ]; then
-    >&2 echo "JOB FAILURE: code $?"
-    exit 1
+def check_cmd code_block
+  %Q{if [[ $? -ne 0 ]]; then
+  echo "CODE BLOCK #{code_block} FAILURE"
+  echo '```'
+  exit 1
 fi
+}
+end
 
-'
+def clean_bash_command_line str
+  str.gsub('\\', '\\\\\\').gsub('"', '\"').gsub('$', '\$')
+end
+
+def clean_non_command_line str
+  str.gsub('`', '\\\`').gsub('"', '\"').gsub('$', '\$')
+end
 
 logger.info { "Generating your bash notebook script!" }
 
+code_block_idx = 0
+
 File.open(notebook_script, "w") do |f|
   in_bash_block = false
+  check_exit_codes = true
+
+  current_command = []
 
   File.open(infile, "rt").each_line do |line|
     line.chomp!
 
-    if line.start_with? "```{bash}"
+    if line.match /```{bash.*}/
       in_bash_block = true
+
+      if line.include? "check=false"
+        check_exit_codes = false
+      else
+        check_exit_codes = true
+      end
+
+      code_block_idx += 1
       f.puts "echo '```'"
     elsif line.start_with?("```") && in_bash_block
-      f.puts "echo '```'"
       # closing delimiter of a bash block
       in_bash_block = false
 
-      f.puts check
+      f.puts "echo"
+
+      # Add in check to end of current command.
+      # Write out the previous command
+      f.puts current_command.join "\n"
+
+      if check_exit_codes
+        f.puts check_cmd code_block_idx
+      end
+
+      f.puts "echo '```'"
+
+      # Reset command holder
+      current_command = []
     elsif in_bash_block
       # In addition to escaping ", we also want to escape $ since
       # it'll be a variable.
-      f.puts %Q{echo "$ #{line.gsub('"', '\"').gsub('$', '\$')}"}
+      f.puts %Q{echo "$ #{clean_bash_command_line line}"}
 
-      f.puts line
+      current_command << line.strip
     elsif line.start_with? "```"
       f.puts "echo '```'"
     else
-      f.puts %Q{echo "#{line.gsub('"', '\"')}"}
+      f.puts %Q{echo "#{clean_non_command_line line}"}
     end
   end
 end
@@ -59,4 +93,6 @@ if $?.success?
   logger.info { "Your notebook successfuly ran!  You can now open #{notebook_output} in your favorite Markdown editor!" }
 else
   logger.error { "There was an error while running your notebook! D: Check #{notebook_output} to see what happened!" }
+
+  abort
 end
